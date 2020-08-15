@@ -123,8 +123,10 @@ func main() {
 			log.Fatal(err)
 		}
 
-		embed := map[string][]discordgo.MessageEmbed{
-			"embeds": []discordgo.MessageEmbed{
+		webhookMessage := discordgo.WebhookParams{
+			Username:  "GT Stamps Health Services",
+			AvatarURL: "https://img.aditya.diwakar.io/stamps.png",
+			Embeds: []*discordgo.MessageEmbed{
 				{
 					Title: fmt.Sprintf("[%s] GT COVID-19 Update", date),
 					Fields: []*discordgo.MessageEmbedField{
@@ -143,7 +145,7 @@ func main() {
 			},
 		}
 
-		jsonStr, _ := json.Marshal(embed)
+		jsonStr, _ := json.Marshal(webhookMessage)
 
 		for _, wh := range conf.Webhook {
 			req, err := http.NewRequest("POST", wh, bytes.NewBuffer(jsonStr))

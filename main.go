@@ -26,7 +26,7 @@ var ctx = context.Background()
 type tomlConfig struct {
 	Redis    redisCredentials
 	Database postgresCredentials
-	Webhook  string
+	Webhook  []string
 }
 
 type redisCredentials struct {
@@ -144,15 +144,20 @@ func main() {
 		}
 
 		jsonStr, _ := json.Marshal(embed)
-		req, err := http.NewRequest("POST", conf.Webhook, bytes.NewBuffer(jsonStr))
-		if err != nil {
-			log.Fatal(err)
-		}
-		req.Header.Set("Content-Type", "application/json")
 
-		_, err = client.Do(req)
-		if err != nil {
-			log.Fatal(res)
+		for _, wh := range conf.Webhook {
+			req, err := http.NewRequest("POST", wh, bytes.NewBuffer(jsonStr))
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			_, err = client.Do(req)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 		}
 
 	}

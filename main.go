@@ -129,6 +129,11 @@ func main() {
 			Embeds: []*discordgo.MessageEmbed{
 				{
 					Title: fmt.Sprintf("[%s] GT COVID-19 Update", date),
+					URL:   "https://health.gatech.edu/coronavirus/health-alerts",
+					Color: 11772777,
+					Footer: &discordgo.MessageEmbedFooter{
+						Text: "Made with ❤️ by Aditya Diwakar",
+					},
 					Fields: []*discordgo.MessageEmbedField{
 						{
 							Name:   "Reported Today",

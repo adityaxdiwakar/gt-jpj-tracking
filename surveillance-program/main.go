@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -83,7 +85,7 @@ func main() {
 
 	client := http.Client{Transport: transport}
 
-	req, err := http.NewRequest("GET", "https://health.gatech.edu/coronavirus/health-alerts", nil)
+	req, err := http.NewRequest("GET", "https://health.gatech.edu/surveillance-testing-program-results", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,23 +104,45 @@ func main() {
 
 	teaser := doc.Find(".super-block__teaser").Nodes[0]
 	table := goquery.NewDocumentFromNode(teaser).Children().Nodes[0]
+
+	// header scraping to find the date
+	header := goquery.NewDocumentFromNode(table).Children().Nodes[0]
+	headerTr := goquery.NewDocumentFromNode(header).Children().Nodes[0]
+	headerTh := goquery.NewDocumentFromNode(headerTr).Children().Nodes[0]
+	headerP := goquery.NewDocumentFromNode(headerTh).Children().Nodes[0]
+	date := headerP.FirstChild.LastChild.FirstChild.Data
+
 	row := goquery.NewDocumentFromNode(table).Children().Nodes[1]
-	tr := goquery.NewDocumentFromNode(row).Children().Nodes[0]
-	data := goquery.NewDocumentFromNode(tr).Children().Nodes
+	tr := goquery.NewDocumentFromNode(row).Children().Nodes
+	tdA := goquery.NewDocumentFromNode(tr[0]).Children().Nodes[1]
+	tdB := goquery.NewDocumentFromNode(tr[1]).Children().Nodes[1]
 
-	date := data[0].FirstChild.Data
-	reported := data[1].FirstChild.Data
-	aggregation := data[2].FirstChild.Data
+	positive := tdA.FirstChild.NextSibling.FirstChild.Data
+	total := tdB.FirstChild.NextSibling.FirstChild.Data
 
-	previousDate, err := rdb.Get(ctx, "gt.cases.lastdate").Result()
+	positive = strings.Replace(positive, ",", "", -1)
+	total = strings.Replace(total, ",", "", -1)
+
+	positiveInt, err := strconv.Atoi(positive)
+	if err != nil {
+		log.Fatal(err)
+	}
+	totalInt, err := strconv.Atoi(total)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(positiveInt, totalInt)
+
+	previousDate, _ := rdb.Get(ctx, "gt.survey.lastdate").Result()
 	if previousDate != date {
-		rdb.Set(ctx, "gt.cases.lastdate", date, 0)
+		rdb.Set(ctx, "gt.survey.lastdate", date, 0)
 
 		sqlStatement := `
-        INSERT INTO cases (date, reported, total) 
+        INSERT INTO survey (date, positive, administered) 
         VALUES ($1, $2, $3)`
 
-		_, err := db.Exec(sqlStatement, date, reported, aggregation)
+		_, err := db.Exec(sqlStatement, date, positiveInt, totalInt)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -128,7 +152,7 @@ func main() {
 			AvatarURL: "https://img.aditya.diwakar.io/stamps.png",
 			Embeds: []*discordgo.MessageEmbed{
 				{
-					Title: fmt.Sprintf("[%s] Covid-19 Exposure and Health Alerts", date),
+					Title: fmt.Sprintf("[%s] Surveillance Testing Program Results ", date),
 					URL:   "https://health.gatech.edu/coronavirus/health-alerts",
 					Color: 11772777,
 					Footer: &discordgo.MessageEmbedFooter{
@@ -136,13 +160,13 @@ func main() {
 					},
 					Fields: []*discordgo.MessageEmbedField{
 						{
-							Name:   "Reported Today",
-							Value:  reported,
+							Name:   "Tested Positive (All Time)",
+							Value:  positive,
 							Inline: true,
 						},
 						{
-							Name:   "Total",
-							Value:  aggregation,
+							Name:   "Tests Administered",
+							Value:  total,
 							Inline: true,
 						},
 					},

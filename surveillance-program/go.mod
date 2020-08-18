@@ -1,4 +1,4 @@
-module github.com/adityaxdiwakar/gt-cases/health-alerts
+module github.com/adityaxdiwakar/gt-cases/surveillance-program
 
 go 1.14
 

@@ -56,6 +56,7 @@ func main() {
 
 	r.Get("/", homePage)
 	r.Get("/cases", getAllCases)
+	r.Get("/testing", getAllSurveys)
 
 	http.ListenAndServe(":3000", r)
 }
@@ -118,8 +119,85 @@ func getAllCases(w http.ResponseWriter, r *http.Request) {
 		caseData = append(caseData, day)
 	}
 
+	uniqueCaseData := make([]CasesRow, 0)
+	uniqueMap := make(map[string]bool)
+
+	for i, day := range caseData {
+		if uniqueMap[day.Date] == false {
+			uniqueMap[day.Date] = true
+			caseData[i].ID = len(uniqueMap)
+			uniqueCaseData = append(uniqueCaseData, caseData[i])
+		}
+	}
+
 	data := CaseResponse{
-		Payload: caseData,
+		Payload: uniqueCaseData,
+		Code:    200,
+	}
+
+	json.NewEncoder(w).Encode(data)
+
+}
+
+type SurveysRow struct {
+	ID           int    `json:"id"`
+	Date         string `json:"date"`
+	Positive     int    `json:"reported"`
+	Administered int    `json:"total"`
+}
+
+type SurveyResponse struct {
+	Payload []SurveysRow `json:"payload"`
+	Code    int          `json:"status_code"`
+}
+
+func getAllSurveys(w http.ResponseWriter, r *http.Request) {
+	statement := `SELECT * FROM survey`
+	rows, err := db.Query(statement)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(StringResponse{
+			Code:    500,
+			Payload: "Internal Server Error",
+		})
+		return
+	}
+
+	surveyData := make([]SurveysRow, 0)
+	defer rows.Close()
+
+	for rows.Next() {
+		day := SurveysRow{}
+
+		if err := rows.Scan(&day.ID, &day.Date, &day.Positive, &day.Administered); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(StringResponse{
+				Code:    500,
+				Payload: "Internal Server Error",
+			})
+			return
+		}
+
+		day.Date = strings.TrimSpace(day.Date)
+
+		surveyData = append(surveyData, day)
+	}
+
+	uniqueSurveyData := make([]SurveysRow, 0)
+	uniqueMap := make(map[string]bool)
+
+	for i, day := range surveyData {
+		if uniqueMap[day.Date] == false {
+			uniqueMap[day.Date] = true
+			surveyData[i].ID = len(uniqueMap)
+			uniqueSurveyData = append(uniqueSurveyData, surveyData[i])
+		}
+	}
+
+	log.Println(uniqueSurveyData)
+
+	data := SurveyResponse{
+		Payload: uniqueSurveyData,
 		Code:    200,
 	}
 

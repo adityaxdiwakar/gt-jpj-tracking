@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +19,15 @@ import (
 	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
 	"golang.org/x/net/context"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 var rdb *redis.Client
 var db *sql.DB
 var conf tomlConfig
 var ctx = context.Background()
+var p *message.Printer
 
 type tomlConfig struct {
 	Redis    redisCredentials
@@ -74,6 +78,19 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	p = message.NewPrinter(language.English)
+}
+
+type SurveyResponse struct {
+	Payload    []Payload `json:"payload"`
+	StatusCode int       `json:"status_code"`
+}
+type Payload struct {
+	ID           int    `json:"id"`
+	Date         string `json:"date"`
+	Positive     int    `json:"positive"`
+	Administered int    `json:"administered"`
 }
 
 func main() {
@@ -134,17 +151,41 @@ func main() {
 
 	log.Println(positiveInt, totalInt)
 
+	// grab the latest record from the API
+	res, err = http.Get("https://api.aditya.diwakar.io/gt-jpj/testing")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer res.Body.Close()
+
+	target := SurveyResponse{}
+	err = json.NewDecoder(res.Body).Decode(&target)
+
+	previousSurveyDate := target.Payload[len(target.Payload)-1]
+	json.NewEncoder(os.Stdout).Encode(previousSurveyDate)
+
 	previousDate, _ := rdb.Get(ctx, "gt.survey.lastdate").Result()
 	if previousDate != date {
 		rdb.Set(ctx, "gt.survey.lastdate", date, 0)
 
 		sqlStatement := `
-        INSERT INTO survey (date, positive, administered) 
+        INSERT INTO surveys (date, positive, administered) 
         VALUES ($1, $2, $3)`
 
 		_, err := db.Exec(sqlStatement, date, positiveInt, totalInt)
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		stringPositive := p.Sprintf("%d", positiveInt-previousSurveyDate.Positive)
+		if positiveInt-previousSurveyDate.Positive > 0 {
+			stringPositive = "+" + stringPositive
+		}
+
+		stringAdmin := p.Sprintf("%d", totalInt-previousSurveyDate.Administered)
+		if totalInt-previousSurveyDate.Administered > 0 {
+			stringAdmin = "+" + stringAdmin
 		}
 
 		webhookMessage := discordgo.WebhookParams{
@@ -153,7 +194,7 @@ func main() {
 			Embeds: []*discordgo.MessageEmbed{
 				{
 					Title: fmt.Sprintf("[%s] Surveillance Testing Program Results ", date),
-					URL:   "https://health.gatech.edu/coronavirus/health-alerts",
+					URL:   "https://health.gatech.edu/surveillance-testing-program-results",
 					Color: 11772777,
 					Footer: &discordgo.MessageEmbedFooter{
 						Text: "Made with ❤️ by Aditya Diwakar",
@@ -161,12 +202,12 @@ func main() {
 					Fields: []*discordgo.MessageEmbedField{
 						{
 							Name:   "Tested Positive (All Time)",
-							Value:  positive,
+							Value:  p.Sprintf("%d (%s)", positiveInt, stringPositive),
 							Inline: true,
 						},
 						{
 							Name:   "Tests Administered",
-							Value:  total,
+							Value:  p.Sprintf("%d (%s)", totalInt, stringAdmin),
 							Inline: true,
 						},
 					},

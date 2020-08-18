@@ -142,8 +142,8 @@ func getAllCases(w http.ResponseWriter, r *http.Request) {
 type SurveysRow struct {
 	ID           int    `json:"id"`
 	Date         string `json:"date"`
-	Positive     int    `json:"reported"`
-	Administered int    `json:"total"`
+	Positive     int    `json:"positive"`
+	Administered int    `json:"administered"`
 }
 
 type SurveyResponse struct {
@@ -193,8 +193,6 @@ func getAllSurveys(w http.ResponseWriter, r *http.Request) {
 			uniqueSurveyData = append(uniqueSurveyData, surveyData[i])
 		}
 	}
-
-	log.Println(uniqueSurveyData)
 
 	data := SurveyResponse{
 		Payload: uniqueSurveyData,

@@ -54,9 +54,9 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Get("/", homePage)
-	r.Get("/cases", getAllCases)
-	r.Get("/testing", getAllSurveys)
+	r.Get("/gt-jpj", homePage)
+	r.Get("/gt-jpj/cases", getAllCases)
+	r.Get("/gt-jpj/testing", getAllSurveys)
 
 	http.ListenAndServe(":3000", r)
 }
@@ -152,7 +152,7 @@ type SurveyResponse struct {
 }
 
 func getAllSurveys(w http.ResponseWriter, r *http.Request) {
-	statement := `SELECT * FROM survey`
+	statement := `SELECT * FROM surveys`
 	rows, err := db.Query(statement)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -110,6 +111,8 @@ func main() {
 	reported := data[1].FirstChild.Data
 	aggregation := data[2].FirstChild.Data
 
+	reported = strings.Replace(reported, "*", "", 1)
+
 	previousDate, err := rdb.Get(ctx, "gt.cases.lastdate").Result()
 	if previousDate != date {
 		rdb.Set(ctx, "gt.cases.lastdate", date, 0)
@@ -128,7 +131,7 @@ func main() {
 			AvatarURL: "https://img.aditya.diwakar.io/stamps.png",
 			Embeds: []*discordgo.MessageEmbed{
 				{
-					Title: fmt.Sprintf("[%s] Covid-19 Exposure and Health Alerts", date),
+					Title: fmt.Sprintf("[%s] GT COVID-19 Update", date),
 					URL:   "https://health.gatech.edu/coronavirus/health-alerts",
 					Color: 11772777,
 					Footer: &discordgo.MessageEmbedFooter{
@@ -160,7 +163,7 @@ func main() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
-			_, err = client.Do(req)
+			res, err = client.Do(req)
 			if err != nil {
 				log.Println(err)
 				continue

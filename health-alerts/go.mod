@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/MetalBlueberry/go-plotly v0.2.0 // indirect
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/bwmarrin/discordgo v0.22.0
 	github.com/go-redis/redis/v8 v8.0.0-beta.7

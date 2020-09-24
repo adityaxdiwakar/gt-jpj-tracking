@@ -75,6 +75,26 @@ func init() {
 	}
 }
 
+type JPJApiReport struct {
+	Payload    []JPJPayload `json:"payload"`
+	StatusCode int          `json:"status_code"`
+}
+
+type JPJPayload struct {
+	ID       int    `json:"id"`
+	Date     string `json:"date"`
+	Reported int    `json:"reported"`
+	Total    int    `json:"total"`
+}
+
+func averagePayload(slice []JPJPayload) float64 {
+	sum := 0
+	for _, k := range slice {
+		sum += k.Reported
+	}
+	return float64(sum) / float64(len(slice))
+}
+
 func main() {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
@@ -115,7 +135,6 @@ func main() {
 
 	previousDate, err := rdb.Get(ctx, "gt.cases.lastdate").Result()
 	if previousDate != date {
-		rdb.Set(ctx, "gt.cases.lastdate", date, 0)
 
 		sqlStatement := `
         INSERT INTO cases (date, reported, total) 
@@ -124,7 +143,28 @@ func main() {
 		_, err := db.Exec(sqlStatement, date, reported, aggregation)
 		if err != nil {
 			log.Fatal(err)
+		} else {
+			// only set redis value if DB insertion was successful
+			rdb.Set(ctx, "gt.cases.lastdate", date, 0)
 		}
+
+		resp, err := client.Get("https://api.aditya.diwakar.io/gt-jpj/cases")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer resp.Body.Close()
+
+		var jpjResponse JPJApiReport
+		err = json.NewDecoder(resp.Body).Decode(&jpjResponse)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		payloadLength := len(jpjResponse.Payload)
+
+		sevenDayMA := averagePayload(jpjResponse.Payload[payloadLength-7 : payloadLength])
+		thirtyDayMA := averagePayload(jpjResponse.Payload[payloadLength-30 : payloadLength])
 
 		webhookMessage := discordgo.WebhookParams{
 			Username:  "GT Stamps Health Services",
@@ -146,6 +186,11 @@ func main() {
 						{
 							Name:   "Total",
 							Value:  aggregation,
+							Inline: true,
+						},
+						{
+							Name:   "7/30 Day MA",
+							Value:  fmt.Sprintf("%.1f/%.1f", sevenDayMA, thirtyDayMA),
 							Inline: true,
 						},
 					},

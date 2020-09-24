@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 type CaseResponse struct {
@@ -428,8 +429,10 @@ func main() {
 	reported := []int{}
 
 	for _, data := range casesWrapped.Payload {
-		dates = append(dates, data.Date)
 		reported = append(reported, data.Reported)
+
+		t, _ := time.Parse("January 2, 2006", data.Date)
+		dates = append(dates, t.Format("2006-01-02"))
 	}
 
 	config := PlotlyConfig{}
